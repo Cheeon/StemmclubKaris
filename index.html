@@ -596,11 +596,11 @@ function paintEdit(){
    Beim Drücken wird ein Ankerpunkt gesetzt. Betroffen ist immer
    das Rechteck zwischen Anker und aktueller Position.
 
-   Ob markiert oder gelöscht wird, entscheidet der Bereich selbst:
-   ist er schon vollständig markiert, wird gelöscht — sonst wird
-   markiert. Damit lässt sich ein bestehender Block verlängern,
-   auch wenn man mitten darin anfängt. Zurückziehen nimmt die
-   Änderung wieder zurück, solange die Taste gehalten wird.
+   Das Startfeld legt fest, was der ganze Zug tut: war es leer,
+   wird markiert; war es belegt, wird gelöscht. Daran ändert sich
+   während des Ziehens nichts mehr — ein Zug macht immer nur eine
+   Sache. Zurückziehen nimmt die Änderung wieder zurück, solange
+   die Taste gehalten wird.
 ------------------------------------------------------------- */
 let dragging = false, dragOn = true;
 let dragAnchor = null, dragSnapshot = null;
@@ -619,6 +619,8 @@ gridEdit.addEventListener("pointerdown", (e) => {
   dragging     = true;
   dragAnchor   = { c: +cell.dataset.c, s: +cell.dataset.s };
   dragSnapshot = snapshotWeek();
+  const startTag = iso(addDays(state.monday, dragAnchor.c));
+  dragOn = dragSnapshot.get(startTag)[dragAnchor.s] !== "1";
   applyRect(dragAnchor);
   gridEdit.setPointerCapture(e.pointerId);
 });
@@ -640,19 +642,6 @@ function applyRect(to){
   const c0 = Math.min(dragAnchor.c, to.c), c1 = Math.max(dragAnchor.c, to.c);
   const s0 = Math.min(dragAnchor.s, to.s), s1 = Math.max(dragAnchor.s, to.s);
   const days = weekDays().map(iso);
-
-  // Ist der gezogene Bereich schon vollständig markiert? Dann löschen,
-  // sonst markieren. Bewertet wird der Stand vor dem Ziehen.
-  let allesVoll = true, etwasFrei = false;
-  for(let c = c0; c <= c1; c++){
-    const vorher = dragSnapshot.get(days[c]);
-    const lock = lockedCount(days[c]);
-    for(let sl = Math.max(s0, lock); sl <= s1; sl++){
-      etwasFrei = true;
-      if(vorher[sl] !== "1") allesVoll = false;
-    }
-  }
-  dragOn = !(etwasFrei && allesVoll);
 
   // erst alles auf den Stand vor dem Ziehen zurücksetzen …
   for(const d of days) state.draft.set(d, dragSnapshot.get(d));
@@ -817,7 +806,7 @@ function showView(v){
   $("#karisBtn").textContent = (v === "edit") ? "Übersicht" : CONFIG.BUTTON_TEXT;
   $("#headLogout").hidden = !(state.me && v === "public");
   if(v === "edit"){
-    $("#editWho").textContent = state.me ? "Verfügbarkeit von " + state.me.name : "";
+    $("#editWho").textContent = "Meine Verfügbarkeiten";
     buildGrid(gridEdit); paintEdit();
   } else {
     buildGrid($("#gridPublic")); paintPublic();
