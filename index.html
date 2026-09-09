@@ -927,8 +927,7 @@ async function init(){
   if(state.monday > letzteWoche()) state.monday = letzteWoche();
   $("#lockHint").textContent =
     `Ziehen markiert, nochmal ziehen löscht. Änderungen sind bis ${CONFIG.SPERRFRIST_STUNDEN} Stunden`
-    + ` vor dem jeweiligen Zeitpunkt möglich – schraffierte Felder sind gesperrt.`
-    + ` Nach ${CONFIG.ABMELDEN_NACH_MINUTEN} Minuten ohne Aktivität wirst du automatisch abgemeldet.`;
+    + ` vor dem jeweiligen Zeitpunkt möglich – schraffierte Felder sind gesperrt.`;
 
   buildGrid($("#gridPublic"));
   await loadPeople();
