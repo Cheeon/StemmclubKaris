@@ -14,13 +14,15 @@ const CONFIG = {
   SUPABASE_URL:      "https://ktygqpqonxhwvhvapiqw.supabase.co",   // z.B. "https://abcdefgh.supabase.co"
   SUPABASE_ANON_KEY: "sb_publishable_ZwLxOmb2ibA9ZuEFnt2OHQ_Kv7tgxhc",   // "publishable"-Key (sb_publishable_…) oder "anon public" (eyJ…)
 
-    TITEL: "KaRis",
-  UNTERTITEL: "Wer ist wann da?",
+  TITEL: "KaRis",
+  SUCH_TITEL: "Wann brauchst du einen Kari?",
 
   BUTTON_TEXT: "KaRis",    // Beschriftung des Anmelde-Buttons
 
-  ANZEIGE_VON_STUNDE: 7,   // erste angezeigte Stunde im Raster
+  ANZEIGE_VON_STUNDE: 8,   // erste angezeigte Stunde im Raster
   ANZEIGE_BIS_STUNDE: 22,  // letzte angezeigte Stunde (exklusiv)
+
+  LETZTER_TAG: "2026-11-08", // weiter als bis zu dieser Woche geht es nicht
 
   SPERRFRIST_STUNDEN: 24,  // so lange vorher ist eine Änderung noch möglich
   ABMELDEN_NACH_MINUTEN: 30, // automatische Abmeldung bei Inaktivität
@@ -115,6 +117,14 @@ label.f{display:flex; flex-direction:column; gap:5px; font-size:12.5px; color:va
   touch-action:none; user-select:none; -webkit-user-select:none;
 }
 .pinrow button.on{background:var(--accent-soft); border-color:var(--accent)}
+.chk{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); cursor:pointer; margin-top:2px}
+.chk input{width:16px; height:16px; accent-color:var(--accent); margin:0}
+.chkhint{font-size:12px; color:var(--muted); margin:4px 0 0 24px; line-height:1.4}
+.linkbtn{
+  background:none; border:none; padding:0; margin:6px 0 0 24px;
+  color:var(--accent); font-size:12.5px; text-decoration:underline; cursor:pointer;
+}
+.linkbtn:hover{background:none}
 .err{color:#c0392b; font-size:13px}
 @media (prefers-color-scheme:dark){ .err{color:#ff8f80} }
 
@@ -144,9 +154,10 @@ table.res td.ex{color:var(--muted); font-size:13px}
 /* ---- Raster ---- */
 .gridwrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
 .grid{
-  display:grid; grid-template-columns:58px repeat(7, minmax(84px,1fr));
-  min-width:680px; user-select:none; -webkit-user-select:none;
+  display:grid; grid-template-columns:54px repeat(7, minmax(84px,1fr)) 54px;
+  min-width:720px; user-select:none; -webkit-user-select:none;
 }
+.grid .gap{height:14px}
 .grid .hd{
   position:sticky; top:0; z-index:2; background:var(--surface);
   border-bottom:1px solid var(--line); padding:8px 4px; text-align:center;
@@ -159,14 +170,15 @@ table.res td.ex{color:var(--muted); font-size:13px}
   font-size:11px; color:var(--muted); text-align:right; padding-right:8px;
   border-right:1px solid var(--line); position:relative; height:20px;
 }
-.tl span{position:relative; top:-9px; background:var(--surface); padding:0 2px}
-.tl.first span{top:0}
+.tl.right{text-align:left; padding:0 0 0 8px; border-right:none; border-left:1px solid var(--line)}
+.tl span{position:relative; top:-8px; background:var(--surface); padding:0 3px}
 .cell{
   height:20px; border-right:1px solid var(--line);
   background:var(--surface-2); position:relative;
 }
 .cell.h0{border-top:1px solid var(--line)}
-.cell .bar{position:absolute; inset:0; background:rgba(var(--heat), var(--a,0)); pointer-events:none}
+.cell.any{background:var(--own-soft)}
+.cell.any::before{content:""; position:absolute; inset:0; background:var(--own); opacity:.55}
 .cell.own::after{content:""; position:absolute; inset:0; background:var(--own); opacity:.85}
 #gridEdit .cell{cursor:crosshair}
 #gridEdit .cell.locked{
@@ -174,6 +186,14 @@ table.res td.ex{color:var(--muted); font-size:13px}
   background:repeating-linear-gradient(45deg, var(--surface-2) 0 4px, var(--lock) 4px 6px);
 }
 #gridEdit .cell.locked.own::after{opacity:.4}
+
+/* ---- Schild an der Maus ---- */
+.tip{
+  position:fixed; z-index:60; pointer-events:none;
+  background:var(--text); color:var(--bg);
+  padding:5px 9px; border-radius:7px; font-size:12.5px; font-weight:500;
+  white-space:nowrap; box-shadow:0 4px 14px rgba(0,0,0,.3);
+}
 
 /* ---- Modal ---- */
 .modal{
@@ -225,7 +245,7 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
   <div id="viewPublic">
 
     <div class="card pad" style="margin-bottom:18px">
-      <h2>Zeitraum prüfen</h2>
+      <h2 id="suchTitel">Wann brauchst du einen Kari?</h2>
       <div class="query">
         <label class="f">Datum <input type="date" id="qDate"></label>
         <label class="f">von <input type="time" id="qFrom" step="1800" value="14:00"></label>
@@ -243,9 +263,7 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
         <div class="range" id="range"></div>
         <div class="spacer"></div>
         <div class="legend">
-          <span class="sw" style="background:var(--surface-2)"></span> niemand
-          <span class="sw" style="background:rgba(var(--heat),.35)"></span>
-          <span class="sw" style="background:rgba(var(--heat),.85)"></span> alle
+          <span class="sw" style="background:var(--own)"></span> jemand ist da – zum Anzeigen mit der Maus darüber
         </div>
       </div>
       <div class="gridwrap"><div class="grid" id="gridPublic"></div></div>
@@ -258,7 +276,6 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
 
     <div class="card pad">
       <div class="editbar">
-        <button id="backBtn">← Übersicht</button>
         <span class="name" id="editWho"></span>
         <span class="spacer"></span>
         <span class="savestate" id="saveState"></span>
@@ -284,6 +301,8 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
 
 </div>
 
+<div class="tip" id="tip" hidden></div>
+
 <!-- ============ ANMELDUNG ============ -->
 <div class="modal" id="loginModal" hidden>
   <div class="modalbox card">
@@ -295,6 +314,10 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
         <input type="password" id="loginPin" autocomplete="off">
         <button type="button" id="pinPeek" title="Gedrückt halten, um die PIN zu sehen">Anzeigen</button>
       </span></label>
+    <label class="chk"><input type="checkbox" id="loginRemember"> PIN auf diesem Gerät merken</label>
+    <div class="chkhint">Nur auf deinem eigenen Rechner oder Handy verwenden.</div>
+    <button type="button" class="linkbtn" id="loginForget" hidden>Gemerkte PIN löschen</button>
+
     <div class="err" id="loginErr"></div>
     <div class="modalrow">
       <button id="loginCancel">Abbrechen</button>
@@ -435,6 +458,16 @@ const TOKEN_KEY = "karis-token";
 function saveToken(t){ try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch(e){} }
 function readToken(){ try { return localStorage.getItem(TOKEN_KEY); } catch(e){ return null; } }
 
+/* ---- Gemerkte Anmeldedaten ---- */
+const REM_KEY = "karis-remember";
+function readRemember(){
+  try { const r = localStorage.getItem(REM_KEY); return r ? JSON.parse(r) : null; } catch(e){ return null; }
+}
+function saveRemember(name, pin){
+  try { localStorage.setItem(REM_KEY, JSON.stringify({name, pin})); } catch(e){}
+}
+function clearRemember(){ try { localStorage.removeItem(REM_KEY); } catch(e){} }
+
 /* ---- Inaktivität ---- */
 const IDLE_MS = Math.max(1, CONFIG.ABMELDEN_NACH_MINUTEN) * 60 * 1000;
 const ACT_KEY = "karis-last-activity";
@@ -496,30 +529,55 @@ function buildGrid(el){
       <div class="dow">${DOW[(d.getDay()+6)%7]}</div>
       <div class="dt">${d.getDate()}.${d.getMonth()+1}.</div></div>`;
   }
-  for(let s = S0; s < S1; s++){
-    html += `<div class="tl${s === S0 ? " first" : ""}">${s % 2 === 0 ? `<span>${slotLabel(s)}</span>` : ""}</div>`;
+  html += '<div class="corner"></div>';
+
+  // Abstand zwischen Kopfzeile und erster Uhrzeit
+  for(let i = 0; i < 9; i++) html += '<div class="gap"></div>';
+
+  for(let sl = S0; sl < S1; sl++){
+    const label = sl % 2 === 0 ? `<span>${slotLabel(sl)}</span>` : "";
+    html += `<div class="tl">${label}</div>`;
     for(let c = 0; c < 7; c++){
-      const cls = s % 2 === 0 ? " h0" : "";
-      html += `<div class="cell${cls}" data-c="${c}" data-s="${s}"><i class="bar"></i></div>`;
+      const cls = sl % 2 === 0 ? " h0" : "";
+      html += `<div class="cell${cls}" data-c="${c}" data-s="${sl}"></div>`;
     }
+    html += `<div class="tl right">${label}</div>`;
   }
   el.innerHTML = html;
+
   const label = `${days[0].getDate()}.${days[0].getMonth()+1}. – ${days[6].getDate()}.${days[6].getMonth()+1}.${days[6].getFullYear()}`;
   $("#range").textContent = label;
   $("#eRange").textContent = label;
+  updateNav();
+}
+
+/* ---- Wochengrenzen ---- */
+function ersteWoche(){ return mondayOf(new Date()); }
+function letzteWoche(){ return mondayOf(parseISO(CONFIG.LETZTER_TAG)); }
+
+function updateNav(){
+  const atFirst = state.monday <= ersteWoche();
+  const atLast  = state.monday >= letzteWoche();
+  for(const id of ["#prevWeek","#ePrevWeek"]) $(id).disabled = atFirst;
+  for(const id of ["#nextWeek","#eNextWeek"]) $(id).disabled = atLast;
+}
+
+function setMonday(m){
+  if(m < ersteWoche()) m = ersteWoche();
+  if(m > letzteWoche()) m = letzteWoche();
+  state.monday = m;
+  buildGrid(state.view === "edit" ? gridEdit : $("#gridPublic"));
+  loadWeek();
 }
 
 function paintPublic(){
   const days = weekDays().map(iso);
-  const total = Math.max(1, state.people.length);
   for(const cell of $("#gridPublic").querySelectorAll(".cell")){
-    const s = +cell.dataset.s, day = days[+cell.dataset.c];
-    let count = 0; const names = [];
-    for(const p of state.people){
-      if(maskOf(p.id, day)[s] === "1"){ count++; names.push(p.name); }
-    }
-    cell.style.setProperty("--a", count ? (0.18 + 0.67 * (count/total)).toFixed(3) : 0);
-    cell.title = `${slotLabel(s)}–${slotLabel(s+1)} · ` + (count ? names.join(", ") : "niemand");
+    const sl = +cell.dataset.s, day = days[+cell.dataset.c];
+    const names = [];
+    for(const p of state.people) if(maskOf(p.id, day)[sl] === "1") names.push(p.name);
+    cell.classList.toggle("any", names.length > 0);
+    cell.dataset.names = names.join(", ");
   }
 }
 
@@ -530,9 +588,7 @@ function paintEdit(){
     const locked = s < lockedCount(day);
     cell.classList.toggle("locked", locked);
     cell.classList.toggle("own", myMask(day)[s] === "1");
-    cell.title = locked
-      ? `${slotLabel(s)} · Änderung nicht mehr möglich`
-      : `${slotLabel(s)}–${slotLabel(s+1)}`;
+
   }
 }
 
@@ -575,6 +631,7 @@ gridEdit.addEventListener("pointermove", (e) => {
 window.addEventListener("pointerup", () => {
   if(!dragging) return;
   dragging = false; dragAnchor = null; dragSnapshot = null;
+  hideTip();
 });
 
 function applyRect(to){
@@ -677,6 +734,52 @@ async function loadPeople(){
 }
 
 /* ============================================================
+   Schild an der Maus
+   ============================================================ */
+const tip = $("#tip");
+function showTip(e, text){
+  if(!text){ hideTip(); return; }
+  tip.textContent = text;
+  tip.hidden = false;
+  const b = tip.getBoundingClientRect();
+  let x = e.clientX + 16, y = e.clientY + 18;
+  if(x + b.width  > innerWidth  - 8) x = e.clientX - b.width - 14;
+  if(y + b.height > innerHeight - 8) y = e.clientY - b.height - 14;
+  tip.style.left = Math.max(8, x) + "px";
+  tip.style.top  = Math.max(8, y) + "px";
+}
+function hideTip(){ tip.hidden = true; }
+
+/* Übersicht: Namen einblenden, wenn jemand da ist */
+$("#gridPublic").addEventListener("pointermove", (e) => {
+  const cell = e.target.closest(".cell");
+  if(!cell || !$("#gridPublic").contains(cell)){ hideTip(); return; }
+  const sl = +cell.dataset.s;
+  const namen = cell.dataset.names;
+  showTip(e, namen ? `${slotLabel(sl)}–${slotLabel(sl+1)}  ·  ${namen}` : "");
+});
+$("#gridPublic").addEventListener("pointerleave", hideTip);
+
+/* Eintragen: Uhrzeit bzw. gezogener Bereich */
+gridEdit.addEventListener("pointermove", (e) => {
+  // beim Ziehen fängt der Zeiger-Fang alle Ereignisse ab, deshalb über die Position suchen
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const cell = el && el.closest ? el.closest(".cell") : null;
+  if(!cell || !gridEdit.contains(cell)){ if(!dragging) hideTip(); return; }
+  const sl = +cell.dataset.s;
+  if(dragging && dragAnchor){
+    const a = Math.min(dragAnchor.s, sl), b = Math.max(dragAnchor.s, sl);
+    showTip(e, `${slotLabel(a)} – ${slotLabel(b+1)}`);
+  } else if(cell.classList.contains("locked")){
+    showTip(e, `${slotLabel(sl)}  ·  gesperrt`);
+  } else {
+    showTip(e, `${slotLabel(sl)}–${slotLabel(sl+1)}`);
+  }
+});
+gridEdit.addEventListener("pointerleave", () => { if(!dragging) hideTip(); });
+window.addEventListener("scroll", hideTip, {passive:true});
+
+/* ============================================================
    Ansichten
    ============================================================ */
 function showView(v){
@@ -696,11 +799,18 @@ function showView(v){
 
 function openLogin(){
   $("#loginErr").textContent = "";
-  $("#loginPin").value = "";
   $("#loginPin").type = "password";
   $("#pinPeek").classList.remove("on");
+
+  const rem = readRemember();
+  const bekannt = rem && state.people.some(p => p.name === rem.name);
+  $("#loginName").value      = bekannt ? rem.name : "";
+  $("#loginPin").value       = bekannt ? rem.pin  : "";
+  $("#loginRemember").checked = !!bekannt;
+  $("#loginForget").hidden    = !bekannt;
+
   $("#loginModal").hidden = false;
-  setTimeout(() => $("#loginName").focus(), 30);
+  setTimeout(() => (bekannt ? $("#loginGo") : $("#loginName")).focus(), 30);
 }
 function closeLogin(){ $("#loginModal").hidden = true; }
 
@@ -715,6 +825,7 @@ async function doLogin(){
     state.token = token;
     state.me = await Store.whoami(token);
     saveToken(token);
+    if($("#loginRemember").checked) saveRemember(name, pin); else clearRemember();
     touchActivity();
     closeLogin();
     showView("edit");
@@ -777,14 +888,18 @@ function runQuery(){
 async function init(){
   $("#titel").textContent = CONFIG.TITEL;
   $("#untertitel").textContent = CONFIG.UNTERTITEL;
+  $("#suchTitel").textContent  = CONFIG.SUCH_TITEL;
   $("#karisBtn").textContent = CONFIG.BUTTON_TEXT;
   document.title = CONFIG.TITEL;
   if(!useSupabase) $("#demoBanner").hidden = false;
   $("#qDate").value = iso(new Date());
+  $("#qDate").min   = iso(new Date());
+  $("#qDate").max   = CONFIG.LETZTER_TAG;
+  if(state.monday < ersteWoche())  state.monday = ersteWoche();
+  if(state.monday > letzteWoche()) state.monday = letzteWoche();
   $("#lockHint").textContent =
     `Ziehen markiert, nochmal ziehen löscht. Änderungen sind bis ${CONFIG.SPERRFRIST_STUNDEN} Stunden`
-    + ` vor dem jeweiligen Zeitpunkt möglich – schraffierte Felder sind gesperrt.`
-    + ` Nach ${CONFIG.ABMELDEN_NACH_MINUTEN} Minuten ohne Aktivität wirst du automatisch abgemeldet.`;
+    + ` vor dem jeweiligen Zeitpunkt möglich – schraffierte Felder sind gesperrt.`;
 
   buildGrid($("#gridPublic"));
   await loadPeople();
@@ -804,9 +919,9 @@ async function init(){
 
   // Öffentliche Ansicht
   $("#qGo").onclick = runQuery;
-  $("#prevWeek").onclick = () => { state.monday = addDays(state.monday, -7); buildGrid($("#gridPublic")); loadWeek(); };
-  $("#nextWeek").onclick = () => { state.monday = addDays(state.monday,  7); buildGrid($("#gridPublic")); loadWeek(); };
-  $("#today").onclick    = () => { state.monday = mondayOf(new Date());      buildGrid($("#gridPublic")); loadWeek(); };
+  $("#prevWeek").onclick = () => setMonday(addDays(state.monday, -7));
+  $("#nextWeek").onclick = () => setMonday(addDays(state.monday,  7));
+  $("#today").onclick    = () => setMonday(mondayOf(new Date()));
 
   // KaRis-Button
   $("#karisBtn").onclick = () => {
@@ -817,12 +932,18 @@ async function init(){
   // Anmeldung
   $("#loginGo").onclick = doLogin;
   $("#loginCancel").onclick = closeLogin;
+  $("#loginForget").onclick = () => {
+    clearRemember();
+    $("#loginPin").value = ""; $("#loginName").value = "";
+    $("#loginRemember").checked = false;
+    $("#loginForget").hidden = true;
+    $("#loginName").focus();
+  };
   $("#loginPin").addEventListener("keydown", e => { if(e.key === "Enter") doLogin(); });
   $("#loginModal").addEventListener("click", e => { if(e.target.id === "loginModal") closeLogin(); });
 
   // Bearbeiten-Ansicht
   $("#saveBtn").onclick = saveAll;
-  $("#backBtn").onclick = leaveEdit;
   $("#logoutBtn").onclick = logout;
   $("#headLogout").onclick = logout;
   $("#noticeClose").onclick = () => { $("#notice").hidden = true; };
@@ -834,9 +955,9 @@ async function init(){
     }
     paintEdit(); markDirty();
   };
-  $("#ePrevWeek").onclick = () => { state.monday = addDays(state.monday, -7); buildGrid(gridEdit); loadWeek().then(paintEdit); };
-  $("#eNextWeek").onclick = () => { state.monday = addDays(state.monday,  7); buildGrid(gridEdit); loadWeek().then(paintEdit); };
-  $("#eToday").onclick    = () => { state.monday = mondayOf(new Date());      buildGrid(gridEdit); loadWeek().then(paintEdit); };
+  $("#ePrevWeek").onclick = () => setMonday(addDays(state.monday, -7));
+  $("#eNextWeek").onclick = () => setMonday(addDays(state.monday,  7));
+  $("#eToday").onclick    = () => setMonday(mondayOf(new Date()));
 
   // PIN sichtbar machen, solange der Knopf gedrückt gehalten wird
   const peek = $("#pinPeek"), pinField = $("#loginPin");
@@ -868,3 +989,4 @@ init();
 </script>
 </body>
 </html>
+
