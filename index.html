@@ -14,16 +14,16 @@ const CONFIG = {
   SUPABASE_URL:      "https://ktygqpqonxhwvhvapiqw.supabase.co",   // z.B. "https://abcdefgh.supabase.co"
   SUPABASE_ANON_KEY: "sb_publishable_ZwLxOmb2ibA9ZuEFnt2OHQ_Kv7tgxhc",   // "publishable"-Key (sb_publishable_…) oder "anon public" (eyJ…)
 
-  TITEL: "KaRis",
+    TITEL: "KaRis",
   UNTERTITEL: "Wer ist wann da?",
 
   BUTTON_TEXT: "KaRis",    // Beschriftung des Anmelde-Buttons
 
-  ANZEIGE_VON_STUNDE: 8,   // erste angezeigte Stunde im Raster
+  ANZEIGE_VON_STUNDE: 7,   // erste angezeigte Stunde im Raster
   ANZEIGE_BIS_STUNDE: 22,  // letzte angezeigte Stunde (exklusiv)
 
   SPERRFRIST_STUNDEN: 24,  // so lange vorher ist eine Änderung noch möglich
-  ABMELDEN_NACH_MINUTEN: 20, // automatische Abmeldung bei Inaktivität
+  ABMELDEN_NACH_MINUTEN: 30, // automatische Abmeldung bei Inaktivität
 };
 </script>
 
@@ -157,16 +157,15 @@ table.res td.ex{color:var(--muted); font-size:13px}
 .grid .corner{position:sticky; top:0; z-index:3; background:var(--surface); border-bottom:1px solid var(--line)}
 .tl{
   font-size:11px; color:var(--muted); text-align:right; padding-right:8px;
-  border-right:1px solid var(--line); position:relative; height:16px;
+  border-right:1px solid var(--line); position:relative; height:20px;
 }
-.tl span{position:relative; top:-7px; background:var(--surface); padding:0 2px}
+.tl span{position:relative; top:-9px; background:var(--surface); padding:0 2px}
 .tl.first span{top:0}
 .cell{
-  height:16px; border-right:1px solid var(--line);
+  height:20px; border-right:1px solid var(--line);
   background:var(--surface-2); position:relative;
 }
 .cell.h0{border-top:1px solid var(--line)}
-.cell.h30{border-top:1px dotted var(--line)}
 .cell .bar{position:absolute; inset:0; background:rgba(var(--heat), var(--a,0)); pointer-events:none}
 .cell.own::after{content:""; position:absolute; inset:0; background:var(--own); opacity:.85}
 #gridEdit .cell{cursor:crosshair}
@@ -229,8 +228,8 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
       <h2>Zeitraum prüfen</h2>
       <div class="query">
         <label class="f">Datum <input type="date" id="qDate"></label>
-        <label class="f">von <input type="time" id="qFrom" step="900" value="14:00"></label>
-        <label class="f">bis <input type="time" id="qTo" step="900" value="16:00"></label>
+        <label class="f">von <input type="time" id="qFrom" step="1800" value="14:00"></label>
+        <label class="f">bis <input type="time" id="qTo" step="1800" value="16:00"></label>
         <button class="primary" id="qGo">Prüfen</button>
       </div>
       <div class="result" id="qResult"></div>
@@ -250,7 +249,6 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
         </div>
       </div>
       <div class="gridwrap"><div class="grid" id="gridPublic"></div></div>
-      <div class="hint" style="margin-top:10px" id="peopleLine"></div>
     </div>
 
   </div>
@@ -284,7 +282,6 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
 
   </div>
 
-  <footer id="foot"></footer>
 </div>
 
 <!-- ============ ANMELDUNG ============ -->
@@ -312,7 +309,8 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
 /* ============================================================
    Grundlagen
    ============================================================ */
-const SLOTS_PER_DAY = 96;
+const SLOTS_PER_DAY = 48;              // 48 × 30 Minuten
+const MIN_PER_SLOT  = 30;
 const EMPTY_MASK = "0".repeat(SLOTS_PER_DAY);
 const DOW = ["Mo","Di","Mi","Do","Fr","Sa","So"];
 
@@ -322,15 +320,15 @@ const iso = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate(
 const parseISO = (s) => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
 const mondayOf = (d) => addDays(d, -(( d.getDay() + 6) % 7));
-const slotLabel = (i) => `${pad2(Math.floor(i/4))}:${pad2((i%4)*15)}`;
-const timeToSlot = (t) => { const [h,m] = t.split(":").map(Number); return h*4 + Math.floor(m/15); };
+const slotLabel = (i) => `${pad2(Math.floor(i/2))}:${pad2((i%2)*30)}`;
+const timeToSlot = (t) => { const [h,m] = t.split(":").map(Number); return h*2 + Math.floor(m/30); };
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 /* Wie viele Slots eines Tages sind gesperrt (beginnen in weniger als X Stunden)? */
 function lockedCount(dayISO){
   const cutoff = Date.now() + CONFIG.SPERRFRIST_STUNDEN * 3600 * 1000;
   const dayStart = parseISO(dayISO).getTime();
-  const n = Math.ceil((cutoff - dayStart) / (15 * 60 * 1000));
+  const n = Math.ceil((cutoff - dayStart) / (MIN_PER_SLOT * 60 * 1000));
   return Math.max(0, Math.min(SLOTS_PER_DAY, n));
 }
 
@@ -373,7 +371,7 @@ const SupabaseStore = {
 
 /* Demo-Speicher: nur dieser Browser. */
 const LocalStore = (() => {
-  const KEY = "karis-demo-v1";
+  const KEY = "karis-demo-v2";
   let mem = null;
   function read(){
     if(mem) return mem;
@@ -484,8 +482,8 @@ const myMask = (day) => state.draft.get(day) || (state.me ? maskOf(state.me.id, 
 /* ============================================================
    Raster
    ============================================================ */
-const S0 = Math.max(0, Math.min(23, CONFIG.ANZEIGE_VON_STUNDE)) * 4;
-const S1 = Math.max(1, Math.min(24, CONFIG.ANZEIGE_BIS_STUNDE)) * 4;
+const S0 = Math.max(0, Math.min(23, CONFIG.ANZEIGE_VON_STUNDE)) * 2;
+const S1 = Math.max(1, Math.min(24, CONFIG.ANZEIGE_BIS_STUNDE)) * 2;
 
 function weekDays(){ return [...Array(7)].map((_, i) => addDays(state.monday, i)); }
 
@@ -499,9 +497,9 @@ function buildGrid(el){
       <div class="dt">${d.getDate()}.${d.getMonth()+1}.</div></div>`;
   }
   for(let s = S0; s < S1; s++){
-    html += `<div class="tl${s === S0 ? " first" : ""}">${s % 4 === 0 ? `<span>${slotLabel(s)}</span>` : ""}</div>`;
+    html += `<div class="tl${s === S0 ? " first" : ""}">${s % 2 === 0 ? `<span>${slotLabel(s)}</span>` : ""}</div>`;
     for(let c = 0; c < 7; c++){
-      const cls = s % 4 === 0 ? " h0" : (s % 4 === 2 ? " h30" : "");
+      const cls = s % 2 === 0 ? " h0" : "";
       html += `<div class="cell${cls}" data-c="${c}" data-s="${s}"><i class="bar"></i></div>`;
     }
   }
@@ -538,43 +536,87 @@ function paintEdit(){
   }
 }
 
-/* ---- Malen per Ziehen (nur in der Bearbeiten-Ansicht) ---- */
+/* ---- Markieren per Ziehen ----------------------------------
+   Beim Drücken wird ein Ankerpunkt gesetzt. Der markierte Bereich
+   ist immer das Rechteck zwischen Anker und aktueller Position.
+   Zieht man wieder zurück, verschwindet die Markierung — solange
+   die Maustaste gehalten wird.
+------------------------------------------------------------- */
 let dragging = false, dragOn = true;
+let dragAnchor = null, dragSnapshot = null;
 const gridEdit = $("#gridEdit");
+
+function snapshotWeek(){
+  const snap = new Map();
+  for(const d of weekDays().map(iso)) snap.set(d, myMask(d));
+  return snap;
+}
 
 gridEdit.addEventListener("pointerdown", (e) => {
   const cell = e.target.closest(".cell");
   if(!cell || !state.me || cell.classList.contains("locked")) return;
   e.preventDefault();
-  const day = iso(addDays(state.monday, +cell.dataset.c));
-  dragging = true;
-  dragOn = myMask(day)[+cell.dataset.s] !== "1";
-  applyCell(cell);
+  dragging     = true;
+  dragAnchor   = { c: +cell.dataset.c, s: +cell.dataset.s };
+  dragSnapshot = snapshotWeek();
+  const day = iso(addDays(state.monday, dragAnchor.c));
+  dragOn = dragSnapshot.get(day)[dragAnchor.s] !== "1";
+  applyRect(dragAnchor);
   gridEdit.setPointerCapture(e.pointerId);
 });
+
 gridEdit.addEventListener("pointermove", (e) => {
   if(!dragging) return;
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const cell = el && el.closest && el.closest(".cell");
-  if(cell && gridEdit.contains(cell)) applyCell(cell);
+  if(cell && gridEdit.contains(cell)) applyRect({ c: +cell.dataset.c, s: +cell.dataset.s });
 });
-window.addEventListener("pointerup", () => { dragging = false; });
 
-function applyCell(cell){
-  if(cell.classList.contains("locked")) return;
-  const day = iso(addDays(state.monday, +cell.dataset.c));
-  const s = +cell.dataset.s;
-  const m = myMask(day);
-  if((m[s] === "1") === dragOn) return;
-  state.draft.set(day, m.slice(0, s) + (dragOn ? "1" : "0") + m.slice(s+1));
+window.addEventListener("pointerup", () => {
+  if(!dragging) return;
+  dragging = false; dragAnchor = null; dragSnapshot = null;
+});
+
+function applyRect(to){
+  const c0 = Math.min(dragAnchor.c, to.c), c1 = Math.max(dragAnchor.c, to.c);
+  const s0 = Math.min(dragAnchor.s, to.s), s1 = Math.max(dragAnchor.s, to.s);
+  const days = weekDays().map(iso);
+
+  // erst alles auf den Stand vor dem Ziehen zurücksetzen …
+  for(const d of days) state.draft.set(d, dragSnapshot.get(d));
+
+  // … dann das aktuelle Rechteck setzen
+  for(let c = c0; c <= c1; c++){
+    const day = days[c];
+    const lock = lockedCount(day);
+    let m = state.draft.get(day);
+    for(let s = Math.max(s0, lock); s <= s1; s++){
+      m = m.slice(0, s) + (dragOn ? "1" : "0") + m.slice(s+1);
+    }
+    state.draft.set(day, m);
+  }
+
+  // Tage ohne echte Änderung wieder aus dem Entwurf nehmen
+  let geaendert = false;
+  for(const d of days){
+    const gespeichert = state.me ? maskOf(state.me.id, d) : EMPTY_MASK;
+    if(state.draft.get(d) === gespeichert) state.draft.delete(d);
+    else geaendert = true;
+  }
+
   paintEdit();
-  markDirty();
+  if(geaendert) markDirty(); else markClean();
 }
 
 function markDirty(){
   const el = $("#saveState");
   el.className = "savestate dirty";
   el.textContent = "ungespeicherte Änderungen";
+}
+function markClean(){
+  const el = $("#saveState");
+  el.className = "savestate";
+  el.textContent = "";
 }
 function markSaved(){
   const el = $("#saveState");
@@ -629,9 +671,6 @@ async function loadWeek(){
 async function loadPeople(){
   try{ state.people = await Store.listPeople() || []; }
   catch(err){ state.people = []; console.error(err); }
-  $("#peopleLine").textContent = state.people.length
-    ? "Gruppe: " + state.people.map(p => p.name).join(", ")
-    : "Noch keine Personen angelegt.";
   const sel = $("#loginName");
   sel.innerHTML = `<option value="">– wählen –</option>`
     + state.people.map(p => `<option>${esc(p.name)}</option>`).join("");
@@ -696,26 +735,24 @@ function runQuery(){
   const rows = [];
   for(const p of state.people){
     const m = maskOf(p.id, day);
-    const blocks = [];
+    const zeiten = [];
     let start = null;
-    for(let s = a; s <= b; s++){
-      const on = s < b && m[s] === "1";
-      if(on && start === null) start = s;
+    for(let sl = a; sl <= b; sl++){
+      const on = sl < b && m[sl] === "1";
+      if(on && start === null) start = sl;
       if(!on && start !== null){
-        // über den Suchzeitraum hinaus schauen
-        let x = start, y = s;
+        // den zusammenhängenden Block über das Suchfenster hinaus verfolgen
+        let x = start, y = sl;
         while(x > 0 && m[x-1] === "1") x--;
         while(y < SLOTS_PER_DAY && m[y] === "1") y++;
-        blocks.push({ from:start, to:s, fullFrom:x, fullTo:y });
+        const label = `${slotLabel(x)}–${slotLabel(y)}`;
+        if(!zeiten.includes(label)) zeiten.push(label);
         start = null;
       }
     }
-    if(blocks.length){
-      const covered = blocks.reduce((n, bl) => n + (bl.to - bl.from), 0);
-      rows.push({ name:p.name, blocks, full: covered === (b - a) });
-    }
+    if(zeiten.length) rows.push({ name:p.name, zeiten });
   }
-  rows.sort((x, y) => (y.full - x.full) || x.name.localeCompare(y.name, "de"));
+  rows.sort((x, y) => x.name.localeCompare(y.name, "de"));
 
   const when = `${parseISO(day).toLocaleDateString("de-DE", {weekday:"long", day:"numeric", month:"long", year:"numeric"})}, ${from}–${to}`;
   if(!rows.length){
@@ -723,19 +760,9 @@ function runQuery(){
       <div class="res-empty">In diesem Zeitraum ist niemand verfügbar.</div>`;
   } else {
     box.innerHTML = `<div class="res-when">${esc(when)}</div><table class="res">`
-      + rows.map(r => {
-          const times = r.blocks.map(bl => `${slotLabel(bl.from)}–${slotLabel(bl.to)}`).join(", ");
-          let extra = "";
-          if(r.full) extra = `<span class="badge">ganzer Zeitraum</span>`;
-          else {
-            const bl = r.blocks[0];
-            const parts = [];
-            if(bl.fullFrom < bl.from) parts.push("ab " + slotLabel(bl.fullFrom));
-            if(bl.fullTo > bl.to) parts.push("bis " + slotLabel(bl.fullTo));
-            if(parts.length) extra = "durchgehend verfügbar " + parts.join(" ");
-          }
-          return `<tr><td class="nm">${esc(r.name)}</td><td class="tm">${times}</td><td class="ex">${extra}</td></tr>`;
-        }).join("")
+      + rows.map(r =>
+          `<tr><td class="nm">${esc(r.name)}</td><td class="tm">${r.zeiten.join(", ")}</td></tr>`
+        ).join("")
       + `</table>`;
   }
 
@@ -758,8 +785,6 @@ async function init(){
     `Ziehen markiert, nochmal ziehen löscht. Änderungen sind bis ${CONFIG.SPERRFRIST_STUNDEN} Stunden`
     + ` vor dem jeweiligen Zeitpunkt möglich – schraffierte Felder sind gesperrt.`
     + ` Nach ${CONFIG.ABMELDEN_NACH_MINUTEN} Minuten ohne Aktivität wirst du automatisch abgemeldet.`;
-  $("#foot").textContent =
-    "Eintragen nur mit Name und PIN. Alle mit dem Link sehen den Kalender, können aber nichts ändern.";
 
   buildGrid($("#gridPublic"));
   await loadPeople();
