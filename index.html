@@ -518,8 +518,9 @@ function showNotice(text){
   $("#notice").hidden = false;
 }
 
-/* Jede Eingabe zählt als Aktivität. */
-["pointerdown","keydown","wheel","touchstart"].forEach(ev =>
+/* Als Aktivität zählt, was jemand bewusst tut: Klicken, Tippen, Antippen.
+   Bloßes Scrollen oder Mausbewegen hält die Anmeldung nicht offen. */
+["pointerdown","keydown","touchstart"].forEach(ev =>
   window.addEventListener(ev, () => { if(state.me) touchActivity(); }, {passive:true}));
 
 async function autoLogout(){
