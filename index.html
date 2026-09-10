@@ -630,6 +630,9 @@ function paintEdit(){
 ------------------------------------------------------------- */
 let dragging = false, dragOn = true;
 let dragAnchor = null, dragSnapshot = null;
+let druck = null;                 // wartender Fingerdruck
+const HALTEN_MS = 260;            // so lange halten, bis das Malen beginnt
+const TOLERANZ  = 12;             // Wischweg in Pixeln, ab dem es ein Wischen ist
 const gridEdit = $("#gridEdit");
 
 function snapshotWeek(){
@@ -638,31 +641,70 @@ function snapshotWeek(){
   return snap;
 }
 
-gridEdit.addEventListener("pointerdown", (e) => {
-  const cell = e.target.closest(".cell");
-  if(!cell || !state.me || cell.classList.contains("locked")) return;
-  e.preventDefault();
+function starteZug(cell, e){
   dragging     = true;
   dragAnchor   = { c: +cell.dataset.c, s: +cell.dataset.s };
   dragSnapshot = snapshotWeek();
   const startTag = iso(addDays(state.monday, dragAnchor.c));
   dragOn = dragSnapshot.get(startTag)[dragAnchor.s] !== "1";
+  if(e.pointerType !== "mouse"){
+    gridEdit.style.touchAction = "none";        // jetzt nicht mehr scrollen
+    if(navigator.vibrate) navigator.vibrate(12);
+  }
   applyRect(dragAnchor);
-  gridEdit.setPointerCapture(e.pointerId);
+  try { gridEdit.setPointerCapture(e.pointerId); } catch(err){}
+}
+
+function beendeZug(){
+  dragging = false; dragAnchor = null; dragSnapshot = null;
+  gridEdit.style.touchAction = "";
+  hideTip();
+}
+
+function druckAbbrechen(){
+  if(druck && druck.timer) clearTimeout(druck.timer);
+  druck = null;
+}
+
+gridEdit.addEventListener("pointerdown", (e) => {
+  const cell = e.target.closest(".cell");
+  if(!cell || !state.me || cell.classList.contains("locked")) return;
+
+  // Maus und Stift: sofort losmalen
+  if(e.pointerType === "mouse"){ e.preventDefault(); starteZug(cell, e); return; }
+
+  // Zweiter Finger heißt zoomen – laufenden Zug zurücknehmen
+  if(druck || dragging){
+    druckAbbrechen();
+    if(dragging){
+      for(const [d, m] of dragSnapshot) state.draft.set(d, m);
+      beendeZug(); paintEdit();
+    }
+    return;
+  }
+
+  // Finger: erst nach kurzem Halten. Bis dahin bleiben Wischen und Zoomen frei.
+  const start = { id:e.pointerId, x:e.clientX, y:e.clientY };
+  druck = start;
+  druck.timer = setTimeout(() => { druck = null; starteZug(cell, e); }, HALTEN_MS);
 });
 
 gridEdit.addEventListener("pointermove", (e) => {
+  // noch im Wartezustand: bewegt sich der Finger, war es ein Wischen
+  if(druck && e.pointerId === druck.id){
+    if(Math.hypot(e.clientX - druck.x, e.clientY - druck.y) > TOLERANZ) druckAbbrechen();
+    return;
+  }
   if(!dragging) return;
+  e.preventDefault();
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  const cell = el && el.closest && el.closest(".cell");
+  const cell = el && el.closest ? el.closest(".cell") : null;
   if(cell && gridEdit.contains(cell)) applyRect({ c: +cell.dataset.c, s: +cell.dataset.s });
-});
+}, {passive:false});
 
-window.addEventListener("pointerup", () => {
-  if(!dragging) return;
-  dragging = false; dragAnchor = null; dragSnapshot = null;
-  hideTip();
-});
+for(const ev of ["pointerup","pointercancel","pointerleave"]){
+  window.addEventListener(ev, () => { druckAbbrechen(); if(dragging) beendeZug(); });
+}
 
 function applyRect(to){
   const c0 = Math.min(dragAnchor.c, to.c), c1 = Math.max(dragAnchor.c, to.c);
