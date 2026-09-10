@@ -88,7 +88,8 @@ body{
 .wrap{max-width:1180px; margin:0 auto; padding:26px 20px 64px; position:relative; z-index:1}
 
 header.top{display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; margin-bottom:22px}
-.brand{display:block}
+.brand{display:block; transition:opacity .12s}
+.brand:hover{opacity:.75}
 #marke{height:58px; width:auto; display:block; object-fit:contain}
 
 .card{
@@ -235,9 +236,10 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
 <div class="wrap">
 
   <header class="top">
-    <div class="brand">
+    <a class="brand" href="https://stemmclub-leipzig.de/" target="_blank" rel="noopener"
+       title="Zur Vereinsseite">
       <img src="logo.png" alt="Stemmclub Leipzig" id="marke">
-    </div>
+    </a>
     <div class="headright">
       <button id="headLogout" hidden>Abmelden</button>
       <button class="primary big" id="karisBtn">KaRis</button>
