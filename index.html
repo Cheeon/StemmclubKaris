@@ -28,7 +28,7 @@ const CONFIG = {
   ABMELDEN_NACH_MINUTEN: 30, // automatische Abmeldung bei Inaktivität
 };
 </script>
-
+   
 <style>
 /* ============================================================
    Farben
@@ -53,7 +53,7 @@ const CONFIG = {
   --wasserzeichen:.28;                   /* Sichtbarkeit des Logos im Hintergrund */
 }
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
+  :root{
     --bg:#141517;
     --surface:rgba(255,255,255,.07);
     --surface-solid:#1E2022;
@@ -63,29 +63,12 @@ const CONFIG = {
     --accent:#93B18F; --on-accent:#101211; --accent-soft:rgba(147,177,143,.18);
     --own:#93B18F; --own-soft:rgba(147,177,143,.30);
     --lock:rgba(255,255,255,.14);
-  --andere:rgba(147,177,143,.20);
     --andere:rgba(147,177,143,.20);
     --ok:#93B18F; --ok-bg:rgba(147,177,143,.16);
     --warn:#D8B978; --warn-bg:rgba(216,185,120,.13);
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 22px rgba(0,0,0,.38);
     --wasserzeichen:.28;
   }
-}
-:root[data-theme="dark"]{
-  --bg:#141517;
-  --surface:rgba(255,255,255,.07);
-  --surface-solid:#1E2022;
-  --surface-2:rgba(255,255,255,.045);
-  --text:#E7E8E5; --muted:#989C97;
-  --line:rgba(255,255,255,.12);
-  --accent:#93B18F; --on-accent:#101211; --accent-soft:rgba(147,177,143,.18);
-  --own:#93B18F; --own-soft:rgba(147,177,143,.30);
-  --lock:rgba(255,255,255,.14);
-  --andere:rgba(147,177,143,.20);
-  --ok:#93B18F; --ok-bg:rgba(147,177,143,.16);
-  --warn:#D8B978; --warn-bg:rgba(216,185,120,.13);
-  --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 22px rgba(0,0,0,.38);
-  --wasserzeichen:.28;
 }
 
 /* Das Logo als Wasserzeichen hinter allem – in beiden Modi dasselbe Bild.
@@ -108,7 +91,6 @@ body{
 header.top{display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; margin-bottom:22px}
 .brand{display:block}
 #marke{height:58px; width:auto; display:block; object-fit:contain}
-.sub{color:var(--muted); font-size:13.5px}
 
 .card{
   background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
@@ -177,11 +159,6 @@ table.res td{padding:8px 10px; border-top:1px solid var(--line); vertical-align:
 table.res tr:first-child td{border-top:none}
 table.res td.nm{font-weight:600; white-space:nowrap; padding-right:18px}
 table.res td.tm{white-space:nowrap; font-variant-numeric:tabular-nums}
-table.res td.ex{color:var(--muted); font-size:13px}
-.badge{
-  display:inline-block; font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:999px;
-  background:var(--ok-bg); color:var(--ok); letter-spacing:.01em;
-}
 
 /* ---- Wochen-Navigation ---- */
 .nav{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px}
@@ -232,7 +209,7 @@ table.res td.ex{color:var(--muted); font-size:13px}
   position:fixed; z-index:60; pointer-events:none;
   background:var(--accent); color:var(--on-accent);
   padding:5px 9px; border-radius:7px; font-size:12.5px; font-weight:500;
-  white-space:nowrap; box-shadow:0 4px 14px rgba(0,0,0,.3);
+  white-space:pre-line; line-height:1.45; box-shadow:0 4px 14px rgba(0,0,0,.3);
 }
 
 /* ---- Modal ---- */
@@ -373,7 +350,6 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
    Grundlagen
    ============================================================ */
 const SLOTS_PER_DAY = 48;              // 48 × 30 Minuten
-const MIN_PER_SLOT  = 30;
 const EMPTY_MASK = "0".repeat(SLOTS_PER_DAY);
 const DOW = ["Mo","Di","Mi","Do","Fr","Sa","So"];
 
@@ -489,30 +465,24 @@ const state = {
   lastAct: Date.now(),
 };
 
-const TOKEN_KEY = "karis-token";
-function saveToken(t){ try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch(e){} }
-function readToken(){ try { return localStorage.getItem(TOKEN_KEY); } catch(e){ return null; } }
+/* Browser-Speicher – in privaten Fenstern kann er blockiert sein,
+   deshalb ist jeder Zugriff abgesichert. */
+const merke = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch(e){} };
+const lies  = (k)    => { try { return localStorage.getItem(k); } catch(e){ return null; } };
 
-/* ---- Gemerkte Anmeldedaten ---- */
-const REM_KEY = "karis-remember";
-function readRemember(){
-  try { const r = localStorage.getItem(REM_KEY); return r ? JSON.parse(r) : null; } catch(e){ return null; }
-}
-function saveRemember(name, pin){
-  try { localStorage.setItem(REM_KEY, JSON.stringify({name, pin})); } catch(e){}
-}
-function clearRemember(){ try { localStorage.removeItem(REM_KEY); } catch(e){} }
+const TOKEN_KEY = "karis-token", REM_KEY = "karis-remember", ACT_KEY = "karis-last-activity";
+const saveToken = (t) => merke(TOKEN_KEY, t);
+const readToken = ()  => lies(TOKEN_KEY);
+
+const saveRemember  = (name, pin) => merke(REM_KEY, JSON.stringify({name, pin}));
+const clearRemember = ()          => merke(REM_KEY, null);
+function readRemember(){ try { return JSON.parse(lies(REM_KEY)); } catch(e){ return null; } }
 
 /* ---- Inaktivität ---- */
 const IDLE_MS = Math.max(1, CONFIG.ABMELDEN_NACH_MINUTEN) * 60 * 1000;
-const ACT_KEY = "karis-last-activity";
-function touchActivity(){
-  state.lastAct = Date.now();
-  try { localStorage.setItem(ACT_KEY, String(state.lastAct)); } catch(e){}
-}
-function readActivity(){
-  try { return Number(localStorage.getItem(ACT_KEY)) || 0; } catch(e){ return 0; }
-}
+const touchActivity = () => merke(ACT_KEY, String(state.lastAct = Date.now()));
+const readActivity  = () => Number(lies(ACT_KEY)) || 0;
+
 function showNotice(text){
   $("#noticeText").textContent = text;
   $("#notice").hidden = false;
@@ -525,21 +495,20 @@ function showNotice(text){
 
 async function autoLogout(){
   const hatteAenderungen = state.draft.size > 0;
-  if(hatteAenderungen){
-    try { await saveAll(); } catch(e){ console.error(e); }
-  }
-  state.draft.clear();
-  state.me = null; state.token = null; saveToken(null);
-  showView("public");
-  showNotice(hatteAenderungen
-    ? `Nach ${CONFIG.ABMELDEN_NACH_MINUTEN} Minuten ohne Aktivität automatisch abgemeldet. Deine Änderungen wurden vorher gespeichert.`
-    : `Nach ${CONFIG.ABMELDEN_NACH_MINUTEN} Minuten ohne Aktivität automatisch abgemeldet.`);
+  if(hatteAenderungen){ try { await saveAll(); } catch(e){ console.error(e); } }
+  verlassen(true, true);
+  showNotice(`Nach ${CONFIG.ABMELDEN_NACH_MINUTEN} Minuten ohne Aktivität automatisch abgemeldet.`
+    + (hatteAenderungen ? " Deine Änderungen wurden vorher gespeichert." : ""));
 }
 
-function logout(){
-  if(state.draft.size && !confirm("Es gibt ungespeicherte Änderungen. Trotzdem abmelden?")) return;
+/* Zurück zur Übersicht. abmelden beendet auch die Anmeldung,
+   ohneRueckfrage überspringt die Nachfrage bei offenen Änderungen. */
+function verlassen(abmelden, ohneRueckfrage){
+  if(!ohneRueckfrage && state.draft.size &&
+     !confirm("Es gibt ungespeicherte Änderungen. Trotzdem " +
+              (abmelden ? "abmelden" : "zurück") + "?")) return;
   state.draft.clear();
-  state.me = null; state.token = null; saveToken(null);
+  if(abmelden){ state.me = null; state.token = null; saveToken(null); }
   showView("public");
 }
 
@@ -608,12 +577,20 @@ function setMonday(m){
 
 function paintPublic(){
   const days = weekDays().map(iso);
+
+  // je Tag und Person einmal die zusammenhängenden Blöcke bestimmen
+  const bloeckeProTag = days.map(day =>
+    state.people.map(p => ({ name: p.name, bl: bloecke(maskOf(p.id, day)) })));
+
   for(const cell of $("#gridPublic").querySelectorAll(".cell")){
-    const sl = +cell.dataset.s, day = days[+cell.dataset.c];
-    const names = [];
-    for(const p of state.people) if(maskOf(p.id, day)[sl] === "1") names.push(p.name);
-    cell.classList.toggle("any", names.length > 0);
-    cell.dataset.names = names.join(", ");
+    const sl = +cell.dataset.s;
+    const zeilen = [];
+    for(const eintrag of bloeckeProTag[+cell.dataset.c]){
+      const b = eintrag.bl.find(x => x[0] <= sl && sl < x[1]);
+      if(b) zeilen.push(`${eintrag.name}  ·  ${slotLabel(b[0])}–${slotLabel(b[1])}`);
+    }
+    cell.classList.toggle("any", zeilen.length > 0);
+    cell.dataset.info = zeilen.join("\n");
   }
 }
 
@@ -624,14 +601,15 @@ function paintEdit(){
     cell.classList.toggle("locked", !darfAendern(day));
     cell.classList.toggle("own", myMask(day)[s] === "1");
 
-    // wer von den anderen ist zu dieser Zeit schon da?
+    // wer von den anderen ist zu dieser Zeit schon da – mit dem ganzen Block
     const andere = [];
-    for(const p of state.people){
-      if(state.me && p.id === state.me.id) continue;
-      if(maskOf(p.id, day)[s] === "1") andere.push(p.name);
+    for(const pers of state.people){
+      if(state.me && pers.id === state.me.id) continue;
+      const b = bloecke(maskOf(pers.id, day)).find(x => x[0] <= s && s < x[1]);
+      if(b) andere.push(`${pers.name}  ·  ${slotLabel(b[0])}–${slotLabel(b[1])}`);
     }
     cell.classList.toggle("andere", andere.length > 0);
-    cell.dataset.andere = andere.join(", ");
+    cell.dataset.andere = andere.join("\n");
   }
 }
 
@@ -804,9 +782,7 @@ function tipAt(e){
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const cell = el && el.closest ? el.closest(".cell") : null;
   if(!cell || !$("#gridPublic").contains(cell)){ hideTip(); return; }
-  const sl = +cell.dataset.s;
-  const namen = cell.dataset.names;
-  showTip(e, namen ? `${slotLabel(sl)}–${slotLabel(sl+1)}  ·  ${namen}` : "");
+  showTip(e, cell.dataset.info || "");
 }
 $("#gridPublic").addEventListener("pointermove", (e) => {
   clearTimeout(tipTimer);
@@ -834,7 +810,7 @@ gridEdit.addEventListener("pointermove", (e) => {
     showTip(e, `${slotLabel(sl)}  ·  vergangener Tag`);
   } else {
     const andere = cell.dataset.andere;
-    showTip(e, `${slotLabel(sl)}–${slotLabel(sl+1)}` + (andere ? `  ·  schon da: ${andere}` : ""));
+    showTip(e, `${slotLabel(sl)}–${slotLabel(sl+1)}` + (andere ? `\nschon da:\n${andere}` : ""));
   }
 });
 gridEdit.addEventListener("pointerleave", () => { if(!dragging) hideTip(); });
@@ -1002,7 +978,7 @@ async function init(){
 
   // KaRis-Button
   $("#karisBtn").onclick = () => {
-    if(state.view === "edit"){ leaveEdit(); return; }
+    if(state.view === "edit"){ verlassen(false); return; }
     if(state.me) showView("edit"); else openLogin();
   };
 
@@ -1021,8 +997,7 @@ async function init(){
 
   // Bearbeiten-Ansicht
   $("#saveBtn").onclick = saveAll;
-  $("#logoutBtn").onclick = logout;
-  $("#headLogout").onclick = logout;
+  for(const id of ["#logoutBtn","#headLogout"]) $(id).onclick = () => verlassen(true);
   $("#noticeClose").onclick = () => { $("#notice").hidden = true; };
   $("#clearWeek").onclick = () => {
     for(const d of weekDays().map(iso)){
@@ -1055,11 +1030,6 @@ async function init(){
   }, 20000);
 }
 
-function leaveEdit(){
-  if(state.draft.size && !confirm("Es gibt ungespeicherte Änderungen. Ansicht trotzdem verlassen?")) return;
-  state.draft.clear();
-  showView("public");
-}
 
 init();
 </script>
