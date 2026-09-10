@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="favicon.png">
 <title>KaRis</title>
 
 <script>
@@ -577,7 +579,7 @@ function setMonday(m){
   if(m > letzteWoche()) m = letzteWoche();
   state.monday = m;
   buildGrid(state.view === "edit" ? gridEdit : $("#gridPublic"));
-  loadWeek();
+  return loadWeek();
 }
 
 function paintPublic(){
@@ -648,7 +650,7 @@ function starteZug(cell, e){
   const startTag = iso(addDays(state.monday, dragAnchor.c));
   dragOn = dragSnapshot.get(startTag)[dragAnchor.s] !== "1";
   if(e.pointerType !== "mouse"){
-    gridEdit.style.touchAction = "none";        // jetzt nicht mehr scrollen
+    scrollSperren(true);
     if(navigator.vibrate) navigator.vibrate(12);
   }
   applyRect(dragAnchor);
@@ -657,8 +659,16 @@ function starteZug(cell, e){
 
 function beendeZug(){
   dragging = false; dragAnchor = null; dragSnapshot = null;
-  gridEdit.style.touchAction = "";
+  scrollSperren(false);
   hideTip();
+}
+
+/* Raster und Seite während des Ziehens festhalten */
+function scrollSperren(an){
+  const wrap = gridEdit.parentElement;          // .gridwrap, waagerecht scrollbar
+  gridEdit.style.touchAction = an ? "none" : "";
+  wrap.style.overflowX       = an ? "hidden" : "";
+  document.body.style.touchAction = an ? "none" : "";
 }
 
 function druckAbbrechen(){
@@ -705,6 +715,14 @@ gridEdit.addEventListener("pointermove", (e) => {
 for(const ev of ["pointerup","pointercancel","pointerleave"]){
   window.addEventListener(ev, () => { druckAbbrechen(); if(dragging) beendeZug(); });
 }
+
+/* Solange gemalt wird, darf nichts scrollen. Das lässt sich nur über
+   touchmove verhindern – preventDefault auf Pointer-Ereignissen reicht
+   dafür nicht, und ein nachträglich gesetztes touch-action wirkt auf die
+   schon laufende Geste nicht mehr. */
+gridEdit.addEventListener("touchmove", (e) => {
+  if(dragging && e.cancelable) e.preventDefault();
+}, {passive:false});
 
 function applyRect(to){
   const c0 = Math.min(dragAnchor.c, to.c), c1 = Math.max(dragAnchor.c, to.c);
@@ -973,16 +991,31 @@ function runQuery(){
       + treffer.map(r => `<tr><td class="nm">${esc(r.name)}</td><td class="tm">${r.zeiten.join(", ")}</td></tr>`).join("")
       + `</table>`;
   } else {
-    // niemand im gesuchten Fenster – was ist sonst an dem Tag los?
-    const hinweise = [];
+    // niemand im gesuchten Fenster – wer geht als letzter, wer kommt als nächster?
+    let vorher = { zeit: -1, namen: [] }, nachher = { zeit: Infinity, namen: [] };
     for(const p of state.people){
       const bl = bloecke(maskOf(p.id, day));
-      if(!bl.length) continue;
       const davor  = bl.filter(x => x[1] <= a).pop();
       const danach = bl.find(x => x[0] >= b);
-      if(davor)  hinweise.push(`${p.name} ist bis ${slotLabel(davor[1])} Uhr da`);
-      if(danach) hinweise.push(`${p.name} kommt um ${slotLabel(danach[0])} Uhr`);
+      if(davor){
+        if(davor[1] > vorher.zeit)        vorher = { zeit: davor[1], namen: [p.name] };
+        else if(davor[1] === vorher.zeit) vorher.namen.push(p.name);
+      }
+      if(danach){
+        if(danach[0] < nachher.zeit)        nachher = { zeit: danach[0], namen: [p.name] };
+        else if(danach[0] === nachher.zeit) nachher.namen.push(p.name);
+      }
     }
+    const aufzaehlung = (n) => n.length === 1 ? n[0]
+      : n.slice(0, -1).join(", ") + " und " + n[n.length - 1];
+
+    const hinweise = [];
+    if(vorher.namen.length)
+      hinweise.push(`${aufzaehlung(vorher.namen)} ${vorher.namen.length === 1 ? "ist" : "sind"}`
+                    + ` bis ${slotLabel(vorher.zeit)} Uhr da`);
+    if(nachher.namen.length)
+      hinweise.push(`${aufzaehlung(nachher.namen)} ${nachher.namen.length === 1 ? "kommt" : "kommen"}`
+                    + ` um ${slotLabel(nachher.zeit)} Uhr`);
     box.innerHTML = kopf
       + `<div class="res-empty">Leider ist zu dem Zeitpunkt niemand von uns vor Ort.</div>`
       + `<div class="res-empty" style="margin-top:6px">`
@@ -990,10 +1023,16 @@ function runQuery(){
                          : "An einem anderen Tag helfen wir dir gerne weiter.")
       + `</div>`;
   }
+}
 
-  // Kalender auf die passende Woche stellen
-  const mo = mondayOf(parseISO(day));
-  if(iso(mo) !== iso(state.monday)) setMonday(mo);
+/* Vor dem Prüfen sicherstellen, dass die Woche des gesuchten Tages geladen ist. */
+async function pruefen(){
+  const day = $("#qDate").value;
+  if(day){
+    const mo = mondayOf(parseISO(day));
+    if(iso(mo) !== iso(state.monday)) await setMonday(mo);
+  }
+  runQuery();
 }
 
 /* ============================================================
@@ -1026,7 +1065,7 @@ async function init(){
   await loadWeek();
 
   // Öffentliche Ansicht
-  $("#qGo").onclick = runQuery;
+  $("#qGo").onclick = pruefen;
   $("#prevWeek").onclick = () => setMonday(addDays(state.monday, -7));
   $("#nextWeek").onclick = () => setMonday(addDays(state.monday,  7));
   $("#today").onclick    = () => setMonday(mondayOf(new Date()));
