@@ -30,35 +30,66 @@ const CONFIG = {
 </script>
 
 <style>
+/* ============================================================
+   Farben
+   Hell: Offwhite · Dunkel: Grauschwarz
+   Akzent aus dem Logo: Dunkelgrün #1D3B1C / Salbeigrün #93B18F
+   ============================================================ */
 :root{
-  --bg:#f6f7f9; --surface:#ffffff; --surface-2:#f0f2f5;
-  --text:#16181d; --muted:#6b7280; --line:#e2e5ea;
-  --accent:#2f6df6; --accent-soft:#dbe6ff;
-  --own:#2f6df6; --own-soft:#c9dbff;
-  --heat:47,109,246; --ok:#1a7f4b; --ok-bg:#e4f5eb; --warn:#8a5a00; --warn-bg:#fdf2dc;
-  --lock:#c9ccd2;
-  --shadow:0 1px 2px rgba(16,24,40,.06), 0 4px 14px rgba(16,24,40,.05);
+  --bg:#F4F2ED;
+  --surface:rgba(255,255,255,.74);
+  --surface-solid:#FBFAF7;               /* für klebende Kopfzeilen */
+  --surface-2:rgba(29,59,28,.06);
+  --text:#1A2318; --muted:#5F6A5C;
+  --line:rgba(29,59,28,.15);
+  --accent:#1D3B1C; --on-accent:#F4F2ED; --accent-soft:rgba(29,59,28,.12);
+  --own:#1D3B1C; --own-soft:#93B18F;
+  --lock:rgba(29,59,28,.22);
+  --ok:#1D3B1C; --ok-bg:rgba(147,177,143,.35);
+  --warn:#6E5312; --warn-bg:rgba(190,160,80,.24);
+  --shadow:0 1px 2px rgba(26,35,24,.06), 0 6px 22px rgba(26,35,24,.07);
   --radius:12px;
+  --wasserzeichen:.07;                   /* Sichtbarkeit des Logos im Hintergrund */
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0e1116; --surface:#161a21; --surface-2:#1d222b;
-    --text:#e8eaef; --muted:#9aa3b2; --line:#2a303b;
-    --accent:#5b8cff; --accent-soft:#1e2b47;
-    --own:#5b8cff; --own-soft:#233254;
-    --heat:91,140,255; --ok:#5ed69b; --ok-bg:#12291f; --warn:#e3b25f; --warn-bg:#2b2213;
-    --lock:#39414f;
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.35);
+    --bg:#141517;
+    --surface:rgba(255,255,255,.055);
+    --surface-solid:#1E2022;
+    --surface-2:rgba(255,255,255,.045);
+    --text:#E7E8E5; --muted:#989C97;
+    --line:rgba(255,255,255,.12);
+    --accent:#93B18F; --on-accent:#101211; --accent-soft:rgba(147,177,143,.18);
+    --own:#93B18F; --own-soft:rgba(147,177,143,.30);
+    --lock:rgba(255,255,255,.14);
+    --ok:#93B18F; --ok-bg:rgba(147,177,143,.16);
+    --warn:#D8B978; --warn-bg:rgba(216,185,120,.13);
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 22px rgba(0,0,0,.38);
+    --wasserzeichen:.10;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0e1116; --surface:#161a21; --surface-2:#1d222b;
-  --text:#e8eaef; --muted:#9aa3b2; --line:#2a303b;
-  --accent:#5b8cff; --accent-soft:#1e2b47;
-  --own:#5b8cff; --own-soft:#233254;
-  --heat:91,140,255; --ok:#5ed69b; --ok-bg:#12291f; --warn:#e3b25f; --warn-bg:#2b2213;
-  --lock:#39414f;
-  --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.35);
+  --bg:#141517;
+  --surface:rgba(255,255,255,.055);
+  --surface-solid:#1E2022;
+  --surface-2:rgba(255,255,255,.045);
+  --text:#E7E8E5; --muted:#989C97;
+  --line:rgba(255,255,255,.12);
+  --accent:#93B18F; --on-accent:#101211; --accent-soft:rgba(147,177,143,.18);
+  --own:#93B18F; --own-soft:rgba(147,177,143,.30);
+  --lock:rgba(255,255,255,.14);
+  --ok:#93B18F; --ok-bg:rgba(147,177,143,.16);
+  --warn:#D8B978; --warn-bg:rgba(216,185,120,.13);
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 22px rgba(0,0,0,.38);
+  --wasserzeichen:.10;
+}
+
+/* Das Logo als Wasserzeichen hinter allem – in beiden Modi dasselbe Bild.
+   Die Datei logo.png muss neben der index.html im Repo liegen. */
+body::before{
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  opacity:var(--wasserzeichen);
+  background:url("logo.png") no-repeat center 56% / min(700px, 84vw);
 }
 
 *{box-sizing:border-box}
@@ -68,13 +99,16 @@ body{
   font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:1180px; margin:0 auto; padding:26px 20px 64px}
+.wrap{max-width:1180px; margin:0 auto; padding:26px 20px 64px; position:relative; z-index:1}
 
 header.top{display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; margin-bottom:22px}
 h1{font-size:23px; line-height:1.2; margin:0 0 2px; letter-spacing:-.015em}
 .sub{color:var(--muted); font-size:13.5px}
 
-.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow)}
+.card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:var(--shadow); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+}
 .pad{padding:16px 18px}
 h2{font-size:15px; margin:0 0 12px; letter-spacing:-.005em}
 
@@ -84,12 +118,12 @@ button{
   transition:background .12s, border-color .12s, filter .12s;
 }
 button:hover{background:var(--surface-2)}
-button.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+button.primary{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
 button.primary:hover{filter:brightness(1.07); background:var(--accent)}
 button.big{padding:10px 20px; font-size:15px; font-weight:600; border-radius:10px}
 button:disabled{opacity:.5; cursor:not-allowed}
 input, select{
-  font:inherit; color:var(--text); background:var(--surface);
+  font:inherit; color:var(--text); background:var(--surface-solid);
   border:1px solid var(--line); border-radius:9px; padding:7px 10px; min-width:0;
 }
 input:focus, select:focus{outline:2px solid var(--accent-soft); border-color:var(--accent)}
@@ -133,11 +167,11 @@ label.f{display:flex; flex-direction:column; gap:5px; font-size:12.5px; color:va
 .result{margin-top:16px}
 .res-empty{font-size:14px; color:var(--muted)}
 .res-when{font-size:13px; color:var(--muted); margin-bottom:10px}
-table.res{width:100%; border-collapse:collapse; font-size:14px}
+table.res{width:auto; border-collapse:collapse; font-size:14px}
 table.res td{padding:8px 10px; border-top:1px solid var(--line); vertical-align:top}
 table.res tr:first-child td{border-top:none}
-table.res td.nm{font-weight:600; width:1%; white-space:nowrap}
-table.res td.tm{white-space:nowrap; width:1%; font-variant-numeric:tabular-nums}
+table.res td.nm{font-weight:600; white-space:nowrap; padding-right:18px}
+table.res td.tm{white-space:nowrap; font-variant-numeric:tabular-nums}
 table.res td.ex{color:var(--muted); font-size:13px}
 .badge{
   display:inline-block; font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:999px;
@@ -159,19 +193,19 @@ table.res td.ex{color:var(--muted); font-size:13px}
 }
 .grid .gap{height:14px}
 .grid .hd{
-  position:sticky; top:0; z-index:2; background:var(--surface);
+  position:sticky; top:0; z-index:2; background:var(--surface-solid);
   border-bottom:1px solid var(--line); padding:8px 4px; text-align:center;
 }
 .grid .hd .dow{font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
 .grid .hd .dt{font-size:15px; font-weight:600}
 .grid .hd.today .dt{color:var(--accent)}
-.grid .corner{position:sticky; top:0; z-index:3; background:var(--surface); border-bottom:1px solid var(--line)}
+.grid .corner{position:sticky; top:0; z-index:3; background:var(--surface-solid); border-bottom:1px solid var(--line)}
 .tl{
   font-size:11px; color:var(--muted); text-align:right; padding-right:8px;
   border-right:1px solid var(--line); position:relative; height:20px;
 }
 .tl.right{text-align:left; padding:0 0 0 8px; border-right:none; border-left:1px solid var(--line)}
-.tl span{position:relative; top:-8px; background:var(--surface); padding:0 3px}
+.tl span{position:relative; top:-8px; background:var(--surface-solid); padding:0 3px}
 .cell{
   height:20px; border-right:1px solid var(--line);
   background:var(--surface-2); position:relative;
@@ -190,7 +224,7 @@ table.res td.ex{color:var(--muted); font-size:13px}
 /* ---- Schild an der Maus ---- */
 .tip{
   position:fixed; z-index:60; pointer-events:none;
-  background:var(--text); color:var(--bg);
+  background:var(--accent); color:var(--on-accent);
   padding:5px 9px; border-radius:7px; font-size:12.5px; font-weight:500;
   white-space:nowrap; box-shadow:0 4px 14px rgba(0,0,0,.3);
 }
@@ -263,7 +297,7 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
         <div class="range" id="range"></div>
         <div class="spacer"></div>
         <div class="legend">
-          <span class="sw" style="background:var(--own)"></span> jemand ist da – zum Anzeigen draufklicken.
+          <span class="sw" style="background:var(--own)"></span> jemand ist da – zum Anzeigen mit der Maus darüber
         </div>
       </div>
       <div class="gridwrap"><div class="grid" id="gridPublic"></div></div>
