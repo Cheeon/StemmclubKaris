@@ -37,7 +37,7 @@ const CONFIG = {
    ============================================================ */
 :root{
   --bg:#F4F2ED;
-  --surface:rgba(255,255,255,.74);
+  --surface:rgba(255,255,255,.52);
   --surface-solid:#FBFAF7;               /* für klebende Kopfzeilen */
   --surface-2:rgba(29,59,28,.06);
   --text:#1A2318; --muted:#5F6A5C;
@@ -49,12 +49,12 @@ const CONFIG = {
   --warn:#6E5312; --warn-bg:rgba(190,160,80,.24);
   --shadow:0 1px 2px rgba(26,35,24,.06), 0 6px 22px rgba(26,35,24,.07);
   --radius:12px;
-  --wasserzeichen:.07;                   /* Sichtbarkeit des Logos im Hintergrund */
+  --wasserzeichen:.28;                   /* Sichtbarkeit des Logos im Hintergrund */
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#141517;
-    --surface:rgba(255,255,255,.055);
+    --surface:rgba(255,255,255,.07);
     --surface-solid:#1E2022;
     --surface-2:rgba(255,255,255,.045);
     --text:#E7E8E5; --muted:#989C97;
@@ -65,12 +65,12 @@ const CONFIG = {
     --ok:#93B18F; --ok-bg:rgba(147,177,143,.16);
     --warn:#D8B978; --warn-bg:rgba(216,185,120,.13);
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 22px rgba(0,0,0,.38);
-    --wasserzeichen:.10;
+    --wasserzeichen:.28;
   }
 }
 :root[data-theme="dark"]{
   --bg:#141517;
-  --surface:rgba(255,255,255,.055);
+  --surface:rgba(255,255,255,.07);
   --surface-solid:#1E2022;
   --surface-2:rgba(255,255,255,.045);
   --text:#E7E8E5; --muted:#989C97;
@@ -81,7 +81,7 @@ const CONFIG = {
   --ok:#93B18F; --ok-bg:rgba(147,177,143,.16);
   --warn:#D8B978; --warn-bg:rgba(216,185,120,.13);
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 22px rgba(0,0,0,.38);
-  --wasserzeichen:.10;
+  --wasserzeichen:.28;
 }
 
 /* Das Logo als Wasserzeichen hinter allem – in beiden Modi dasselbe Bild.
@@ -89,7 +89,7 @@ const CONFIG = {
 body::before{
   content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
   opacity:var(--wasserzeichen);
-  background:url("logo.png") no-repeat center 56% / min(700px, 84vw);
+  background:url("logo.png") no-repeat center 58% / min(820px, 92vw);
 }
 
 *{box-sizing:border-box}
@@ -102,12 +102,13 @@ body{
 .wrap{max-width:1180px; margin:0 auto; padding:26px 20px 64px; position:relative; z-index:1}
 
 header.top{display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; margin-bottom:22px}
-h1{font-size:23px; line-height:1.2; margin:0 0 2px; letter-spacing:-.015em}
+.brand{display:block}
+#marke{height:58px; width:auto; display:block; object-fit:contain}
 .sub{color:var(--muted); font-size:13.5px}
 
 .card{
   background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
-  box-shadow:var(--shadow); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  box-shadow:var(--shadow); backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px);
 }
 .pad{padding:16px 18px}
 h2{font-size:15px; margin:0 0 12px; letter-spacing:-.005em}
@@ -253,9 +254,8 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
 <div class="wrap">
 
   <header class="top">
-    <div>
-      <h1 id="titel">KaRis</h1>
-      <div class="sub" id="untertitel">Wer ist wann da?</div>
+    <div class="brand">
+      <img src="logo.png" alt="Stemmclub Leipzig" id="marke">
     </div>
     <div class="headright">
       <button id="headLogout" hidden>Abmelden</button>
@@ -937,8 +937,6 @@ function runQuery(){
    Start
    ============================================================ */
 async function init(){
-  $("#titel").textContent = CONFIG.TITEL;
-  $("#untertitel").textContent = CONFIG.UNTERTITEL;
   $("#suchTitel").textContent  = CONFIG.SUCH_TITEL;
   $("#karisBtn").textContent = CONFIG.BUTTON_TEXT;
   document.title = CONFIG.TITEL;
