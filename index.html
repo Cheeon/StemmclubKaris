@@ -189,8 +189,8 @@ table.res td.ex{color:var(--muted); font-size:13px}
 /* ---- Raster ---- */
 .gridwrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
 .grid{
-  display:grid; grid-template-columns:54px repeat(7, minmax(84px,1fr)) 54px;
-  min-width:720px; user-select:none; -webkit-user-select:none;
+  display:grid; grid-template-columns:62px repeat(7, minmax(84px,1fr)) 62px;
+  min-width:740px; user-select:none; -webkit-user-select:none;
 }
 .grid .gap{height:14px}
 .grid .hd{
@@ -202,11 +202,11 @@ table.res td.ex{color:var(--muted); font-size:13px}
 .grid .hd.today .dt{color:var(--accent)}
 .grid .corner{position:sticky; top:0; z-index:3; background:var(--surface-solid); border-bottom:1px solid var(--line)}
 .tl{
-  font-size:11px; color:var(--muted); text-align:right; padding-right:8px;
+  font-size:13px; color:var(--muted); text-align:right; padding-right:9px;
   border-right:1px solid var(--line); position:relative; height:20px;
 }
 .tl.right{text-align:left; padding:0 0 0 8px; border-right:none; border-left:1px solid var(--line)}
-.tl span{position:relative; top:-8px; background:var(--surface-solid); padding:0 3px}
+.tl span{position:relative; top:-9px; background:var(--surface-solid); padding:0 3px}
 .cell{
   height:20px; border-right:1px solid var(--line);
   background:var(--surface-2); position:relative;
@@ -381,13 +381,13 @@ const slotLabel = (i) => `${pad2(Math.floor(i/2))}:${pad2((i%2)*30)}`;
 const timeToSlot = (t) => { const [h,m] = t.split(":").map(Number); return h*2 + Math.floor(m/30); };
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-/* Wie viele Slots eines Tages sind gesperrt (beginnen in weniger als X Stunden)? */
-function lockedCount(dayISO){
-  const cutoff = Date.now() + CONFIG.SPERRFRIST_STUNDEN * 3600 * 1000;
-  const dayStart = parseISO(dayISO).getTime();
-  const n = Math.ceil((cutoff - dayStart) / (MIN_PER_SLOT * 60 * 1000));
-  return Math.max(0, Math.min(SLOTS_PER_DAY, n));
-}
+/* Was darf an einem Tag noch geändert werden?
+   Eintragen geht immer – auch spontan für heute.
+   Austragen nur, solange der Tag noch nicht begonnen hat,
+   also bis zum Tageswechsel um 0 Uhr. */
+const heute = () => iso(new Date());
+const darfEintragen = (dayISO) => dayISO >= heute();
+const darfAustragen = (dayISO) => dayISO >  heute();
 
 /* ============================================================
    Speicher-Schicht
@@ -463,10 +463,12 @@ const LocalStore = (() => {
     async saveDay(token, dayISO, mask){
       const id = String(token || "").replace(/^demo:/, "");
       read();
-      // Sperrfrist auch im Demo-Modus nachbilden
-      const lock = lockedCount(dayISO);
-      const old = mem.avail[id + "|" + dayISO] || EMPTY_MASK;
-      mem.avail[id + "|" + dayISO] = old.slice(0, lock) + mask.slice(lock);
+      const alt = mem.avail[id + "|" + dayISO] || EMPTY_MASK;
+      let neu;
+      if(!darfEintragen(dayISO))      neu = alt;                    // vergangener Tag
+      else if(!darfAustragen(dayISO)) neu = [...alt].map((c,i) => (c === "1" || mask[i] === "1") ? "1" : "0").join("");
+      else                            neu = mask;
+      mem.avail[id + "|" + dayISO] = neu;
       write();
     }
   };
@@ -619,7 +621,8 @@ function paintEdit(){
   const days = weekDays().map(iso);
   for(const cell of $("#gridEdit").querySelectorAll(".cell")){
     const s = +cell.dataset.s, day = days[+cell.dataset.c];
-    const locked = s < lockedCount(day);
+    const belegt = myMask(day)[s] === "1";
+    const locked = belegt ? !darfAustragen(day) : !darfEintragen(day);
     cell.classList.toggle("locked", locked);
     cell.classList.toggle("own", myMask(day)[s] === "1");
 
@@ -683,9 +686,9 @@ function applyRect(to){
   // … dann das aktuelle Rechteck setzen
   for(let c = c0; c <= c1; c++){
     const day = days[c];
-    const lock = lockedCount(day);
+    if(dragOn ? !darfEintragen(day) : !darfAustragen(day)) continue;
     let m = state.draft.get(day);
-    for(let s = Math.max(s0, lock); s <= s1; s++){
+    for(let s = s0; s <= s1; s++){
       m = m.slice(0, s) + (dragOn ? "1" : "0") + m.slice(s+1);
     }
     state.draft.set(day, m);
@@ -822,7 +825,10 @@ gridEdit.addEventListener("pointermove", (e) => {
     const a = Math.min(dragAnchor.s, sl), b = Math.max(dragAnchor.s, sl);
     showTip(e, `${slotLabel(a)} – ${slotLabel(b+1)}`);
   } else if(cell.classList.contains("locked")){
-    showTip(e, `${slotLabel(sl)}  ·  gesperrt`);
+    const tag = iso(addDays(state.monday, +cell.dataset.c));
+    showTip(e, `${slotLabel(sl)}  ·  ` + (darfEintragen(tag)
+      ? "Austragen ist für heute nicht mehr möglich"
+      : "vergangener Tag"));
   } else {
     showTip(e, `${slotLabel(sl)}–${slotLabel(sl+1)}`);
   }
@@ -947,8 +953,9 @@ async function init(){
   if(state.monday < ersteWoche())  state.monday = ersteWoche();
   if(state.monday > letzteWoche()) state.monday = letzteWoche();
   $("#lockHint").textContent =
-    `Ziehen markiert, nochmal ziehen löscht. Änderungen sind bis ${CONFIG.SPERRFRIST_STUNDEN} Stunden`
-    + ` vor dem jeweiligen Zeitpunkt möglich – schraffierte Felder sind gesperrt.`;
+    "Ziehen ab einem leeren Feld markiert, ab einem belegten löscht."
+    + " Eintragen geht jederzeit, auch spontan für heute."
+    + " Austragen nur bis zum Tageswechsel – schraffierte Felder sind gesperrt.";
 
   buildGrid($("#gridPublic"));
   await loadPeople();
@@ -998,9 +1005,8 @@ async function init(){
   $("#noticeClose").onclick = () => { $("#notice").hidden = true; };
   $("#clearWeek").onclick = () => {
     for(const d of weekDays().map(iso)){
-      const lock = lockedCount(d);
-      const m = myMask(d);
-      state.draft.set(d, m.slice(0, lock) + EMPTY_MASK.slice(lock));
+      if(!darfAustragen(d)) continue;
+      state.draft.set(d, EMPTY_MASK);
     }
     paintEdit(); markDirty();
   };
