@@ -45,6 +45,7 @@ const CONFIG = {
   --accent:#1D3B1C; --on-accent:#F4F2ED; --accent-soft:rgba(29,59,28,.12);
   --own:#1D3B1C; --own-soft:#93B18F;
   --lock:rgba(29,59,28,.22);
+  --andere:rgba(147,177,143,.40);
   --ok:#1D3B1C; --ok-bg:rgba(147,177,143,.35);
   --warn:#6E5312; --warn-bg:rgba(190,160,80,.24);
   --shadow:0 1px 2px rgba(26,35,24,.06), 0 6px 22px rgba(26,35,24,.07);
@@ -62,6 +63,8 @@ const CONFIG = {
     --accent:#93B18F; --on-accent:#101211; --accent-soft:rgba(147,177,143,.18);
     --own:#93B18F; --own-soft:rgba(147,177,143,.30);
     --lock:rgba(255,255,255,.14);
+  --andere:rgba(147,177,143,.20);
+    --andere:rgba(147,177,143,.20);
     --ok:#93B18F; --ok-bg:rgba(147,177,143,.16);
     --warn:#D8B978; --warn-bg:rgba(216,185,120,.13);
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 22px rgba(0,0,0,.38);
@@ -78,6 +81,7 @@ const CONFIG = {
   --accent:#93B18F; --on-accent:#101211; --accent-soft:rgba(147,177,143,.18);
   --own:#93B18F; --own-soft:rgba(147,177,143,.30);
   --lock:rgba(255,255,255,.14);
+  --andere:rgba(147,177,143,.20);
   --ok:#93B18F; --ok-bg:rgba(147,177,143,.16);
   --warn:#D8B978; --warn-bg:rgba(216,185,120,.13);
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 22px rgba(0,0,0,.38);
@@ -216,6 +220,7 @@ table.res td.ex{color:var(--muted); font-size:13px}
 .cell.any::before{content:""; position:absolute; inset:0; background:var(--own); opacity:.55}
 .cell.own::after{content:""; position:absolute; inset:0; background:var(--own); opacity:.85}
 #gridEdit .cell{cursor:crosshair}
+#gridEdit .cell.andere{background:var(--andere)}
 #gridEdit .cell.locked{
   cursor:not-allowed;
   background:repeating-linear-gradient(45deg, var(--surface-2) 0 4px, var(--lock) 4px 6px);
@@ -323,6 +328,7 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
         <button id="eNextWeek" title="Nächste Woche">→</button>
         <div class="range" id="eRange"></div>
         <div class="spacer"></div>
+        <div class="legend"><span class="sw" style="background:var(--andere)"></span> andere sind schon da</div>
         <button id="clearWeek">Woche leeren</button>
       </div>
 
@@ -381,13 +387,9 @@ const slotLabel = (i) => `${pad2(Math.floor(i/2))}:${pad2((i%2)*30)}`;
 const timeToSlot = (t) => { const [h,m] = t.split(":").map(Number); return h*2 + Math.floor(m/30); };
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-/* Was darf an einem Tag noch geändert werden?
-   Eintragen geht immer – auch spontan für heute.
-   Austragen nur, solange der Tag noch nicht begonnen hat,
-   also bis zum Tageswechsel um 0 Uhr. */
+/* Vergangene Tage sind unveränderlich, alles andere ist frei. */
 const heute = () => iso(new Date());
-const darfEintragen = (dayISO) => dayISO >= heute();
-const darfAustragen = (dayISO) => dayISO >  heute();
+const darfAendern = (dayISO) => dayISO >= heute();
 
 /* ============================================================
    Speicher-Schicht
@@ -464,10 +466,7 @@ const LocalStore = (() => {
       const id = String(token || "").replace(/^demo:/, "");
       read();
       const alt = mem.avail[id + "|" + dayISO] || EMPTY_MASK;
-      let neu;
-      if(!darfEintragen(dayISO))      neu = alt;                    // vergangener Tag
-      else if(!darfAustragen(dayISO)) neu = [...alt].map((c,i) => (c === "1" || mask[i] === "1") ? "1" : "0").join("");
-      else                            neu = mask;
+      const neu = darfAendern(dayISO) ? mask : alt;
       mem.avail[id + "|" + dayISO] = neu;
       write();
     }
@@ -621,11 +620,17 @@ function paintEdit(){
   const days = weekDays().map(iso);
   for(const cell of $("#gridEdit").querySelectorAll(".cell")){
     const s = +cell.dataset.s, day = days[+cell.dataset.c];
-    const belegt = myMask(day)[s] === "1";
-    const locked = belegt ? !darfAustragen(day) : !darfEintragen(day);
-    cell.classList.toggle("locked", locked);
+    cell.classList.toggle("locked", !darfAendern(day));
     cell.classList.toggle("own", myMask(day)[s] === "1");
 
+    // wer von den anderen ist zu dieser Zeit schon da?
+    const andere = [];
+    for(const p of state.people){
+      if(state.me && p.id === state.me.id) continue;
+      if(maskOf(p.id, day)[s] === "1") andere.push(p.name);
+    }
+    cell.classList.toggle("andere", andere.length > 0);
+    cell.dataset.andere = andere.join(", ");
   }
 }
 
@@ -686,7 +691,7 @@ function applyRect(to){
   // … dann das aktuelle Rechteck setzen
   for(let c = c0; c <= c1; c++){
     const day = days[c];
-    if(dragOn ? !darfEintragen(day) : !darfAustragen(day)) continue;
+    if(!darfAendern(day)) continue;
     let m = state.draft.get(day);
     for(let s = s0; s <= s1; s++){
       m = m.slice(0, s) + (dragOn ? "1" : "0") + m.slice(s+1);
@@ -825,12 +830,10 @@ gridEdit.addEventListener("pointermove", (e) => {
     const a = Math.min(dragAnchor.s, sl), b = Math.max(dragAnchor.s, sl);
     showTip(e, `${slotLabel(a)} – ${slotLabel(b+1)}`);
   } else if(cell.classList.contains("locked")){
-    const tag = iso(addDays(state.monday, +cell.dataset.c));
-    showTip(e, `${slotLabel(sl)}  ·  ` + (darfEintragen(tag)
-      ? "Austragen ist für heute nicht mehr möglich"
-      : "vergangener Tag"));
+    showTip(e, `${slotLabel(sl)}  ·  vergangener Tag`);
   } else {
-    showTip(e, `${slotLabel(sl)}–${slotLabel(sl+1)}`);
+    const andere = cell.dataset.andere;
+    showTip(e, `${slotLabel(sl)}–${slotLabel(sl+1)}` + (andere ? `  ·  schon da: ${andere}` : ""));
   }
 });
 gridEdit.addEventListener("pointerleave", () => { if(!dragging) hideTip(); });
@@ -953,9 +956,7 @@ async function init(){
   if(state.monday < ersteWoche())  state.monday = ersteWoche();
   if(state.monday > letzteWoche()) state.monday = letzteWoche();
   $("#lockHint").textContent =
-    "Ziehen ab einem leeren Feld markiert, ab einem belegten löscht."
-    + " Eintragen geht jederzeit, auch spontan für heute."
-    + " Austragen nur bis zum Tageswechsel – schraffierte Felder sind gesperrt.";
+    "Ziehen ab einem leeren Feld markiert, ab einem belegten löscht.";
 
   buildGrid($("#gridPublic"));
   await loadPeople();
@@ -1005,7 +1006,7 @@ async function init(){
   $("#noticeClose").onclick = () => { $("#notice").hidden = true; };
   $("#clearWeek").onclick = () => {
     for(const d of weekDays().map(iso)){
-      if(!darfAustragen(d)) continue;
+      if(!darfAendern(d)) continue;
       state.draft.set(d, EMPTY_MASK);
     }
     paintEdit(); markDirty();
