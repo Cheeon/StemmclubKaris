@@ -287,8 +287,8 @@ footer{margin-top:28px; color:var(--muted); font-size:12.5px}
       <h2 id="suchTitel">Wann brauchst du einen Kari?</h2>
       <div class="query">
         <label class="f">Datum <input type="date" id="qDate"></label>
-        <label class="f">von <input type="time" id="qFrom" step="1800" value="14:00"></label>
-        <label class="f">bis <input type="time" id="qTo" step="1800" value="16:00"></label>
+        <label class="f">von <input type="time" id="qFrom" step="1800"></label>
+        <label class="f">bis <input type="time" id="qTo" step="1800"></label>
         <button class="primary" id="qGo">Prüfen</button>
       </div>
       <div class="result" id="qResult"></div>
@@ -895,51 +895,71 @@ async function doLogin(){
 /* ============================================================
    Zeitraum prüfen
    ============================================================ */
+/* alle zusammenhängenden Blöcke einer Maske als [von, bis) */
+function bloecke(mask){
+  const out = []; let start = null;
+  for(let s = 0; s <= SLOTS_PER_DAY; s++){
+    const on = s < SLOTS_PER_DAY && mask[s] === "1";
+    if(on && start === null) start = s;
+    if(!on && start !== null){ out.push([start, s]); start = null; }
+  }
+  return out;
+}
+
 function runQuery(){
   const day = $("#qDate").value;
   const from = $("#qFrom").value, to = $("#qTo").value;
   const box = $("#qResult");
-  if(!day || !from || !to){ box.innerHTML = `<div class="res-empty">Bitte Datum und Zeitraum angeben.</div>`; return; }
-  const a = timeToSlot(from), b = timeToSlot(to);
-  if(b <= a){ box.innerHTML = `<div class="res-empty">Die Endzeit muss nach der Startzeit liegen.</div>`; return; }
-
-  const rows = [];
-  for(const p of state.people){
-    const m = maskOf(p.id, day);
-    const zeiten = [];
-    let start = null;
-    for(let sl = a; sl <= b; sl++){
-      const on = sl < b && m[sl] === "1";
-      if(on && start === null) start = sl;
-      if(!on && start !== null){
-        // den zusammenhängenden Block über das Suchfenster hinaus verfolgen
-        let x = start, y = sl;
-        while(x > 0 && m[x-1] === "1") x--;
-        while(y < SLOTS_PER_DAY && m[y] === "1") y++;
-        const label = `${slotLabel(x)}–${slotLabel(y)}`;
-        if(!zeiten.includes(label)) zeiten.push(label);
-        start = null;
-      }
-    }
-    if(zeiten.length) rows.push({ name:p.name, zeiten });
+  if(!day || !from || !to){
+    box.innerHTML = `<div class="res-empty">Bitte Datum und Zeitraum angeben.</div>`;
+    return;
   }
-  rows.sort((x, y) => x.name.localeCompare(y.name, "de"));
+  const a = timeToSlot(from), b = timeToSlot(to);
+  if(b <= a){
+    box.innerHTML = `<div class="res-empty">Die Endzeit muss nach der Startzeit liegen.</div>`;
+    return;
+  }
+  if(a < S0 || b > S1){
+    box.innerHTML = `<div class="res-empty">Wir müssen auch mal schlafen.</div>`;
+    return;
+  }
 
   const when = `${parseISO(day).toLocaleDateString("de-DE", {weekday:"long", day:"numeric", month:"long", year:"numeric"})}, ${from}–${to}`;
-  if(!rows.length){
-    box.innerHTML = `<div class="res-when">${esc(when)}</div>
-      <div class="res-empty">In diesem Zeitraum ist niemand verfügbar.</div>`;
-  } else {
-    box.innerHTML = `<div class="res-when">${esc(when)}</div><table class="res">`
-      + rows.map(r =>
-          `<tr><td class="nm">${esc(r.name)}</td><td class="tm">${r.zeiten.join(", ")}</td></tr>`
-        ).join("")
+  const kopf = `<div class="res-when">${esc(when)}</div>`;
+
+  const treffer = [];
+  for(const p of state.people){
+    const bl = bloecke(maskOf(p.id, day)).filter(x => x[0] < b && x[1] > a);
+    if(bl.length) treffer.push({ name:p.name, zeiten: bl.map(x => `${slotLabel(x[0])}–${slotLabel(x[1])}`) });
+  }
+
+  if(treffer.length){
+    treffer.sort((x, y) => x.name.localeCompare(y.name, "de"));
+    box.innerHTML = kopf + `<table class="res">`
+      + treffer.map(r => `<tr><td class="nm">${esc(r.name)}</td><td class="tm">${r.zeiten.join(", ")}</td></tr>`).join("")
       + `</table>`;
+  } else {
+    // niemand im gesuchten Fenster – was ist sonst an dem Tag los?
+    const hinweise = [];
+    for(const p of state.people){
+      const bl = bloecke(maskOf(p.id, day));
+      if(!bl.length) continue;
+      const davor  = bl.filter(x => x[1] <= a).pop();
+      const danach = bl.find(x => x[0] >= b);
+      if(davor)  hinweise.push(`${p.name} ist bis ${slotLabel(davor[1])} Uhr da`);
+      if(danach) hinweise.push(`${p.name} kommt um ${slotLabel(danach[0])} Uhr`);
+    }
+    box.innerHTML = kopf
+      + `<div class="res-empty">Leider ist zu dem Zeitpunkt niemand von uns vor Ort.</div>`
+      + `<div class="res-empty" style="margin-top:6px">`
+      + (hinweise.length ? esc(hinweise.join(". ")) + "."
+                         : "An einem anderen Tag helfen wir dir gerne weiter.")
+      + `</div>`;
   }
 
   // Kalender auf die passende Woche stellen
-  const m = mondayOf(parseISO(day));
-  if(iso(m) !== iso(state.monday)){ state.monday = m; buildGrid($("#gridPublic")); loadWeek(); }
+  const mo = mondayOf(parseISO(day));
+  if(iso(mo) !== iso(state.monday)) setMonday(mo);
 }
 
 /* ============================================================
@@ -972,7 +992,6 @@ async function init(){
   }
 
   await loadWeek();
-  runQuery();
 
   // Öffentliche Ansicht
   $("#qGo").onclick = runQuery;
