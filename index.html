@@ -23,8 +23,7 @@ const CONFIG = {
   ANZEIGE_BIS_STUNDE: 22,  // letzte angezeigte Stunde (exklusiv)
 
   LETZTER_TAG: "2026-11-08", // weiter als bis zu dieser Woche geht es nicht
-
-  SPERRFRIST_STUNDEN: 24,  // so lange vorher ist eine Änderung noch möglich
+   
   ABMELDEN_NACH_MINUTEN: 30, // automatische Abmeldung bei Inaktivität
 };
 </script>
@@ -360,7 +359,10 @@ const parseISO = (s) => { const [y,m,d] = s.split("-").map(Number); return new D
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
 const mondayOf = (d) => addDays(d, -(( d.getDay() + 6) % 7));
 const slotLabel = (i) => `${pad2(Math.floor(i/2))}:${pad2((i%2)*30)}`;
-const timeToSlot = (t) => { const [h,m] = t.split(":").map(Number); return h*2 + Math.floor(m/30); };
+/* Anfangszeiten werden auf den Halbstundenblock abgerundet, Endzeiten aufgerundet.
+   Wer 15:45 als Ende angibt, meint auch den Block 15:30–16:00. */
+const slotVon = (t) => { const [h,m] = t.split(":").map(Number); return h*2 + Math.floor(m/30); };
+const slotBis = (t) => { const [h,m] = t.split(":").map(Number); return h*2 + Math.ceil(m/30); };
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 /* Vergangene Tage sind unveränderlich, alles andere ist frei. */
@@ -891,7 +893,7 @@ function runQuery(){
     box.innerHTML = `<div class="res-empty">Bitte Datum und Zeitraum angeben.</div>`;
     return;
   }
-  const a = timeToSlot(from), b = timeToSlot(to);
+  const a = slotVon(from), b = slotBis(to);
   if(b <= a){
     box.innerHTML = `<div class="res-empty">Die Endzeit muss nach der Startzeit liegen.</div>`;
     return;
