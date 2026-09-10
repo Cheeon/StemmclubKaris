@@ -885,10 +885,20 @@ function bloecke(mask){
   return out;
 }
 
+function sonderText(day){
+  if(day < heute())        return "Wir können gut judgen, aber noch nicht in der Zeit reisen.";
+  if(day === "2026-11-07" || day === "2026-11-08") return "Viel Erfolg auf der LM!";
+  if(day > CONFIG.LETZTER_TAG) return "Vielleicht geht es nächstes Jahr weiter.";
+  return "";
+}
+
 function runQuery(){
   const day = $("#qDate").value;
   const from = $("#qFrom").value, to = $("#qTo").value;
   const box = $("#qResult");
+
+  const sonder = day && sonderText(day);
+  if(sonder){ box.innerHTML = `<div class="res-empty">${esc(sonder)}</div>`; return; }
   if(!day || !from || !to){
     box.innerHTML = `<div class="res-empty">Bitte Datum und Zeitraum angeben.</div>`;
     return;
@@ -950,8 +960,6 @@ async function init(){
   document.title = CONFIG.TITEL;
   if(!useSupabase) $("#demoBanner").hidden = false;
   $("#qDate").value = iso(new Date());
-  $("#qDate").min   = iso(new Date());
-  $("#qDate").max   = CONFIG.LETZTER_TAG;
   if(state.monday < ersteWoche())  state.monday = ersteWoche();
   if(state.monday > letzteWoche()) state.monday = letzteWoche();
   $("#lockHint").textContent =
